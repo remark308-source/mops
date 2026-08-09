@@ -1,47 +1,66 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-TW">
 <head>
-    <title>MOPS 監控看板</title>
+    <meta charset="UTF-8">
+    <title>MOPS 股市監控看板</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f4f7f6; }
-        .card { background: white; padding: 15px; margin-bottom: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .red { color: #d9534f; font-weight: bold; }
-        table { width: 100%; border-collapse: collapse; background: white; }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        body { font-family: "Microsoft JhengHei", sans-serif; background: #f0f2f5; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { color: #1a73e8; border-left: 5px solid #1a73e8; padding-left: 15px; }
+        .section { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 30px; }
+        .ann-item { border-bottom: 1px solid #eee; padding: 15px 0; }
+        .ann-item:last-child { border-bottom: none; }
+        .ann-header { font-weight: bold; color: #d93025; margin-bottom: 5px; }
+        .ann-subject { font-size: 1.1em; line-height: 1.4; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { background: #f8f9fa; color: #5f6368; padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6; }
+        td { padding: 12px; border-bottom: 1px solid #eee; }
+        .loading { text-align: center; color: #888; padding: 20px; }
     </style>
 </head>
 <body>
-    <h1>今日重大公告</h1>
-    <div id="announcements">載入中...</div>
+    <div class="container">
+        <h1>今日重大公告</h1>
+        <div id="ann-list" class="section"><div class="loading">正在讀取最新公告...</div></div>
 
-    <h1>營收增長排行榜</h1>
-    <table id="revenueTable">
-        <thead><tr><th>公司</th><th>增減百分比</th><th>本月營收</th></tr></thead>
-        <tbody></tbody>
-    </table>
+        <h1>營收統計概覽</h1>
+        <div class="section">
+            <table id="rev-table">
+                <thead><tr><th>公司名稱</th><th>公司代號</th><th>營收數據</th><th>增減率</th></tr></thead>
+                <tbody><tr><td colspan="4" class="loading">正在讀取營收資料...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
 
     <script>
-        fetch('./data/announcements.json').then(r => r.json()).then(data => {
-            const container = document.getElementById('announcements');
-            container.innerHTML = data.map(item => `
-                <div class="card">
-                    <h3>${item.companyName} (${item.companyId}) - ${item.date}</h3>
-                    <p><strong>主旨：</strong>${item.subject}</p>
-                    <small>${item.description}</small>
-                </div>
-            `).join('');
-        });
+        // 讀取公告
+        fetch('./data/announcements.json')
+            .then(res => res.json())
+            .then(data => {
+                const list = document.getElementById('ann-list');
+                if (data.length === 0) { list.innerHTML = '今日暫無符合關鍵字的重大公告'; return; }
+                list.innerHTML = data.map(i => `
+                    <div class="ann-item">
+                        <div class="ann-header">[${i.id}] ${i.name} - ${i.date}</div>
+                        <div class="ann-subject">${i.subject}</div>
+                    </div>
+                `).join('');
+            }).catch(() => document.getElementById('ann-list').innerHTML = '資料讀取失敗');
 
-        fetch('./data/revenue.json').then(r => r.json()).then(data => {
-            const tbody = document.querySelector('#revenueTable tbody');
-            tbody.innerHTML = data.map(item => `
-                <tr>
-                    <td>${item.name} (${item.id})</td>
-                    <td class="${parseFloat(item.growth) > 20 ? 'red' : ''}">${item.growth}</td>
-                    <td>${item.revenue}</td>
-                </tr>
-            `).join('');
-        });
+        // 讀取營收
+        fetch('./data/revenue.json')
+            .then(res => res.json())
+            .then(data => {
+                const tbody = document.querySelector('#rev-table tbody');
+                tbody.innerHTML = data.map(i => `
+                    <tr>
+                        <td>${i.name}</td>
+                        <td>${i.id}</td>
+                        <td>${i.revenue}</td>
+                        <td style="color:${parseFloat(i.growth) > 0 ? '#d93025' : '#188038'}">${i.growth}</td>
+                    </tr>
+                `).join('');
+            });
     </script>
 </body>
 </html>
