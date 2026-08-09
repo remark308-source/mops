@@ -2,7 +2,7 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 
-// 模拟浏览器的 Headers
+// 模拟浏览器的请求头，防止被封
 const headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Accept': 'application/json, text/plain, */*',
@@ -12,38 +12,43 @@ const headers = {
 };
 
 async function run() {
+    // 确保数据存储目录存在
     const dataDir = path.join(__dirname, '../docs/data');
-    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+    if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+    }
 
     try {
-        console.log('正在获取公告列表...');
-        const res = await axios.post('https://mops.twse.com.tw/mops/api/home_page/t05sr01_1', 
+        console.log('正在从公开资讯观测站获取数据...');
+        
+        // 1. 抓取重大公告
+        const annRes = await axios.post('https://mops.twse.com.tw/mops/api/home_page/t05sr01_1', 
             { count: "0", marketKind: "" }, { headers });
         
-        const announcements = (res.data?.result?.data || [])
-            .filter(item => ['自結', '財務業務', '營收'].some(k => item.subject.includes(k)))
-            .slice(0, 5) // 先取5笔测试
+        const keywords = ['自結', '財務業務', '營收'];
+        const announcements = (annRes.data?.result?.data || [])
+            .filter(item => keywords.some(k => item.subject.includes(k)))
+            .slice(0, 10)
             .map(item => ({
-                companyName: item.companyAbbreviation,
-                companyId: item.companyId,
+                name: item.companyAbbreviation,
+                id: item.companyId,
                 date: item.date,
-                subject: item.subject,
-                description: "點擊查看詳情" // 简化处理
+                subject: item.subject
             }));
 
-        fs.writeFileSync(path.join(dataDir, 'announcements.json'), JSON.stringify(announcements, null, 2));
-        
-        // 模拟营收数据（先确保页面能跑通）
-        const mockRevenue = [
-            { name: "台積電", id: "2330", revenue: "200,000M", growth: "25.5%" },
-            { name: "鴻海", id: "2317", revenue: "150,000M", growth: "12.3%" }
+        // 2. 模拟营收数据 (先确保逻辑通畅，后续可根据需要扩展营收抓取)
+        const revenue = [
+            { name: "数据更新中", id: "0000", revenue: "N/A", growth: "0%" }
         ];
-        fs.writeFileSync(path.join(dataDir, 'revenue.json'), JSON.stringify(mockRevenue, null, 2));
+
+        // 写入文件
+        fs.writeFileSync(path.join(dataDir, 'announcements.json'), JSON.stringify(announcements, null, 2));
+        fs.writeFileSync(path.join(dataDir, 'revenue.json'), JSON.stringify(revenue, null, 2));
         
-        console.log(`成功写入 ${announcements.length} 条公告`);
-    } catch (e) {
-        console.error('抓取失败:', e.message);
-        // 即使失败也写入空数组，防止前端卡死
+        console.log(`成功抓取 ${announcements.length} 条公告并保存。`);
+    } catch (error) {
+        console.error('抓取过程中出错:', error.message);
+        // 出错时写入空数组防止页面白屏
         fs.writeFileSync(path.join(dataDir, 'announcements.json'), JSON.stringify([], null, 2));
         fs.writeFileSync(path.join(dataDir, 'revenue.json'), JSON.stringify([], null, 2));
     }
