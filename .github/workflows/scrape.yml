@@ -1,0 +1,26 @@
+name: MOPS Data Scraper
+on:
+  schedule:
+    - cron: '30 23,13 * * *' # 对应 UTC 时间的 07:30 和 21:30 (台北时间)
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - name: Install dependencies
+        run: npm install axios
+      - name: Run Scraper
+        run: node scripts/crawler.js
+      - name: Commit and Push
+        run: |
+          git config --global user.name "Github Action"
+          git config --global user.email "action@github.com"
+          git add docs/data/*.json
+          git commit -m "Update MOPS data" || exit 0
+          git push
