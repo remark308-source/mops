@@ -14,8 +14,15 @@
         .ann-subject { font-size: 1.1em; line-height: 1.4; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th { background: #f8f9fa; color: #5f6368; padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6; }
+        /* 排序表頭樣式 */
+        th.sortable { cursor: pointer; user-select: none; position: relative; transition: background 0.2s; }
+        th.sortable:hover { background: #edf2ff; color: #1a73e8; }
+        th.sortable::after { content: ' ↕'; opacity: 0.3; font-size: 0.8em; }
+        
         td { padding: 12px; border-bottom: 1px solid #eee; }
         .loading { text-align: center; color: #888; padding: 20px; }
+        .positive { color: #d93025; font-weight: bold; }
+        .negative { color: #188038; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -26,19 +33,31 @@
         <h1>營收統計概覽</h1>
         <div class="section">
             <table id="rev-table">
-                <thead><tr><th>公司名稱</th><th>公司代號</th><th>營收數據</th><th>增減率</th></tr></thead>
-                <tbody><tr><td colspan="4" class="loading">正在讀取營收資料...</td></tr></tbody>
+                <thead>
+                    <tr>
+                        <th>公司名稱</th>
+                        <th>公司代號</th>
+                        <th>營收數據</th>
+                        <th id="sort-growth" class="sortable">增減率</th>
+                    </tr>
+                </thead>
+                <tbody id="rev-body">
+                    <tr><td colspan="4" class="loading">正在讀取營收資料...</td></tr>
+                </tbody>
             </table>
         </div>
     </div>
 
     <script>
+        let revenueData = [];
+        let sortAsc = false; // 預設降冪排序
+
         // 讀取公告
         fetch('./data/announcements.json')
             .then(res => res.json())
             .then(data => {
                 const list = document.getElementById('ann-list');
-                if (data.length === 0) { list.innerHTML = '今日暫無符合關鍵字的重大公告'; return; }
+                if (!data || data.length === 0) { list.innerHTML = '今日暫無符合關鍵字的重大公告'; return; }
                 list.innerHTML = data.map(i => `
                     <div class="ann-item">
                         <div class="ann-header">[${i.id}] ${i.name} - ${i.date}</div>
@@ -47,20 +66,44 @@
                 `).join('');
             }).catch(() => document.getElementById('ann-list').innerHTML = '資料讀取失敗');
 
-        // 讀取營收
-        fetch('./data/revenue.json')
-            .then(res => res.json())
-            .then(data => {
-                const tbody = document.querySelector('#rev-table tbody');
-                tbody.innerHTML = data.map(i => `
+        // 渲染營收表格的函數
+        function renderTable(data) {
+            const tbody = document.getElementById('rev-body');
+            tbody.innerHTML = data.map(i => {
+                const growthVal = parseFloat(i.growth);
+                const colorClass = growthVal > 0 ? 'positive' : (growthVal < 0 ? 'negative' : '');
+                return `
                     <tr>
                         <td>${i.name}</td>
                         <td>${i.id}</td>
                         <td>${i.revenue}</td>
-                        <td style="color:${parseFloat(i.growth) > 0 ? '#d93025' : '#188038'}">${i.growth}</td>
+                        <td class="${colorClass}">${i.growth}</td>
                     </tr>
-                `).join('');
+                `;
+            }).join('');
+        }
+
+        // 讀取營收資料
+        fetch('./data/revenue.json')
+            .then(res => res.json())
+            .then(data => {
+                revenueData = data;
+                renderTable(revenueData);
+            }).catch(() => document.getElementById('rev-body').innerHTML = '<tr><td colspan="4">資料讀取失敗</td></tr>');
+
+        // 排序邏輯
+        document.getElementById('sort-growth').addEventListener('click', function() {
+            sortAsc = !sortAsc;
+            this.innerText = '增減率 ' + (sortAsc ? '↑' : '↓');
+            
+            const sorted = [...revenueData].sort((a, b) => {
+                const valA = parseFloat(a.growth) || 0;
+                const valB = parseFloat(b.growth) || 0;
+                return sortAsc ? valA - valB : valB - valA;
             });
+            
+            renderTable(sorted);
+        });
     </script>
 </body>
 </html>
