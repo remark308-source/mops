@@ -11,29 +11,29 @@ const headers = {
 };
 
 /**
- * 核心解析函數：修正了正則表達式中的斜線轉義問題
+ * 核心解析函數：改用字符串構造正則，徹底解決 SyntaxError
  */
 function parseRevenueHtml(html) {
     let result = { "公司名稱": "", "公司代號": "", "資料期間": "", "本月營收": "", "增減百分比": "", "備註": "" };
     
     if (!html) return result;
 
-    const idMatch = html.match(/name='compID'\s*value='(\d+)'/i);
+    // 使用字符串構造正則表達式，避免 / 衝突
+    const idMatch = html.match(new RegExp("name='compID'\\s*value='(\\d+)'", "i"));
     result["公司代號"] = idMatch ? idMatch[1] : "";
 
-    const nameMatch = html.match(/本資料由\s*\(.*?\)\s*([^\s ]+)/);
+    const nameMatch = html.match(new RegExp("本資料由\\s*\\(.*?\\)\\s*([^\\s ]+)", ""));
     result["公司名稱"] = nameMatch ? nameMatch[1].trim() : "";
 
-    const periodMatch = html.match(/民國(\d+)年(\d+)月/);
+    const periodMatch = html.match(new RegExp("民國(\\d+)年(\\d+)月", ""));
     result["資料期間"] = periodMatch ? `民國${periodMatch[1]}年${periodMatch[2]}月` : "";
 
-    // 修正點：使用 [\/] 或轉義 \/ 來避免正則表達式提前結束
-    const tableMatch = html.match(/<TABLE[^>]*class='hasBorder'[^>]*>([\s\S]*?)<\/TABLE>/i);
+    // 定位表格內容
+    const tableMatch = html.match(new RegExp("<TABLE[^>]*class='hasBorder'[^>]*>([\\s\\S]*?)<\\/TABLE>", "i"));
     if (tableMatch) {
         const tableContent = tableMatch[1];
         
         const fetchValue = (label, content) => {
-            // 轉義了 <\/TD>
             const regex = new RegExp(label + "[\\s\\S]*?<TD[^>]*>([\\s\\S]*?)<\\/TD>", "i");
             const match = content.match(regex);
             return match ? match[1].replace(/<[^>]*>/g, '').replace(/&nbsp;/g, '').trim() : '';
@@ -44,8 +44,7 @@ function parseRevenueHtml(html) {
         const firstHalf = parts[0];
         result["增減百分比"] = fetchValue('增減百分比', firstHalf) + "%";
 
-        // 修正點：轉義了 <\/TD>
-        const noteMatch = tableContent.match(/(?:備註|原因說明)[\s\S]*?<TD[^>]*>([\s\S]*?)<\\/TD>/i);
+        const noteMatch = tableContent.match(new RegExp("(?:備註|原因說明)[\\s\\S]*?<TD[^>]*>([\\s\\S]*?)<\\/TD>", "i"));
         result["備註"] = noteMatch ? noteMatch[1].replace(/<[^>]*>/g, '').replace(/&nbsp;/g, '').trim() : '';
     }
 
@@ -94,7 +93,7 @@ async function run() {
                         'Content-Type': 'application/x-www-form-urlencoded',
                         'Referer': 'https://mopsov.twse.com.tw/mops/web/t05st10_ifrs' 
                     },
-                    responseType: 'text', timeout: 20000
+                    responseType: 'text', timeout: 25000
                 });
 
                 const parsed = parseRevenueHtml(detailRes.data);
