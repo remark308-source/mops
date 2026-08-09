@@ -1,47 +1,36 @@
-name: MOPS Data Scraper
+name: MOPS_Data_Auto_Scraper
+
 on:
   schedule:
-    - cron: '30 23,13 * * *' # 对应 UTC 时间的 07:30 和 21:30 (台北时间)
+    - cron: '30 23,13 * * *' # 台北时间 07:30 和 21:30 自动执行
   push:
     branches: [ main ]
-  workflow_dispatch: # 允许手动触发
+  workflow_dispatch: # 允许你手动点击按钮运行
 
 jobs:
-  build:
+  run_scraper:
     runs-on: ubuntu-latest
-    scrape:
-    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v3
-      - name: Setup Node
+      - name: 检查代码
+        uses: actions/checkout@v3
+
+      - name: 安装 Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18
-      - name: Install axios
+          node-version: '18'
+
+      - name: 安装依赖包
         run: npm install axios
-      - name: Run Crawler
+
+      - name: 执行抓取脚本
         run: node scripts/crawler.js
-      - name: Commit files
+
+      - name: 将数据存回仓库
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/data/*.json
-          git commit -m "Update data" || echo "No changes to commit"
-          git push
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-      - name: Install dependencies
-        run: npm install axios
-      - name: Run Scraper
-        run: node scripts/crawler.js
-      - name: Commit and Push
-        run: |
-          git config --global user.name "Github Action"
-          git config --global user.email "action@github.com"
-          git add docs/data/*.json
-          git commit -m "Update MOPS data" || exit 0
+          git commit -m "自动更新数据: $(date)" || echo "没有数据更新"
           git push
