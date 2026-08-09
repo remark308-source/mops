@@ -5,104 +5,85 @@
     <title>MOPS 股市監控看板</title>
     <style>
         body { font-family: "Microsoft JhengHei", sans-serif; background: #f0f2f5; margin: 0; padding: 20px; color: #333; }
-        .container { max-width: 900px; margin: 0 auto; }
-        h1 { color: #1a73e8; border-left: 5px solid #1a73e8; padding-left: 15px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        h1 { color: #1a73e8; border-left: 5px solid #1a73e8; padding-left: 15px; display: flex; align-items: center; justify-content: space-between; }
         .section { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 30px; }
+        .search-box { padding: 8px 15px; border: 1px solid #ddd; border-radius: 20px; font-size: 14px; width: 250px; }
         .ann-item { border-bottom: 1px solid #eee; padding: 15px 0; }
-        .ann-item:last-child { border-bottom: none; }
         .ann-header { font-weight: bold; color: #d93025; margin-bottom: 5px; }
-        .ann-subject { font-size: 1.1em; line-height: 1.4; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; }
         th { background: #f8f9fa; color: #5f6368; padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6; }
-        /* 排序表頭樣式 */
-        th.sortable { cursor: pointer; user-select: none; position: relative; transition: background 0.2s; }
-        th.sortable:hover { background: #edf2ff; color: #1a73e8; }
-        th.sortable::after { content: ' ↕'; opacity: 0.3; font-size: 0.8em; }
-        
-        td { padding: 12px; border-bottom: 1px solid #eee; }
-        .loading { text-align: center; color: #888; padding: 20px; }
+        th.sortable { cursor: pointer; }
+        td { padding: 12px; border-bottom: 1px solid #eee; vertical-align: top; }
         .positive { color: #d93025; font-weight: bold; }
         .negative { color: #188038; font-weight: bold; }
+        .note-text { font-size: 0.85em; color: #666; margin-top: 4px; display: block; max-width: 400px; line-height: 1.4; }
+        .count-badge { font-size: 0.5em; background: #1a73e8; color: white; padding: 2px 8px; border-radius: 10px; margin-left: 10px; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>今日重大公告</h1>
-        <div id="ann-list" class="section"><div class="loading">正在讀取最新公告...</div></div>
+        <div id="ann-list" class="section">讀取中...</div>
 
-        <h1>營收統計概覽</h1>
+        <h1>
+            當月營收累計 <span id="rev-count" class="count-badge">0</span>
+            <input type="text" id="search" class="search-box" placeholder="搜尋公司名稱或代號...">
+        </h1>
         <div class="section">
             <table id="rev-table">
                 <thead>
                     <tr>
-                        <th>公司名稱</th>
-                        <th>公司代號</th>
-                        <th>營收數據</th>
-                        <th id="sort-growth" class="sortable">增減率</th>
+                        <th style="width: 150px;">公司名稱</th>
+                        <th style="width: 100px;">代號</th>
+                        <th style="width: 150px;">營收數據</th>
+                        <th id="sort-growth" class="sortable" style="width: 100px;">增減率 ↕</th>
+                        <th>備註說明</th>
                     </tr>
                 </thead>
-                <tbody id="rev-body">
-                    <tr><td colspan="4" class="loading">正在讀取營收資料...</td></tr>
-                </tbody>
+                <tbody id="rev-body"></tbody>
             </table>
         </div>
     </div>
 
     <script>
         let revenueData = [];
-        let sortAsc = false; // 預設降冪排序
+        let sortAsc = false;
 
-        // 讀取公告
-        fetch('./data/announcements.json')
-            .then(res => res.json())
-            .then(data => {
-                const list = document.getElementById('ann-list');
-                if (!data || data.length === 0) { list.innerHTML = '今日暫無符合關鍵字的重大公告'; return; }
-                list.innerHTML = data.map(i => `
-                    <div class="ann-item">
-                        <div class="ann-header">[${i.id}] ${i.name} - ${i.date}</div>
-                        <div class="ann-subject">${i.subject}</div>
-                    </div>
-                `).join('');
-            }).catch(() => document.getElementById('ann-list').innerHTML = '資料讀取失敗');
+        fetch('./data/announcements.json').then(res => res.json()).then(data => {
+            const list = document.getElementById('ann-list');
+            list.innerHTML = data.length ? data.map(i => `<div class="ann-item"><div class="ann-header">[${i.id}] ${i.name} - ${i.date}</div><div>${i.subject}</div></div>`).join('') : '今日暫無公告';
+        });
 
-        // 渲染營收表格的函數
-        function renderTable(data) {
+        function renderTable(filterText = '') {
             const tbody = document.getElementById('rev-body');
-            tbody.innerHTML = data.map(i => {
+            const filtered = revenueData.filter(i => i.name.includes(filterText) || i.id.includes(filterText));
+            document.getElementById('rev-count').innerText = filtered.length;
+            tbody.innerHTML = filtered.map(i => {
                 const growthVal = parseFloat(i.growth);
                 const colorClass = growthVal > 0 ? 'positive' : (growthVal < 0 ? 'negative' : '');
                 return `
                     <tr>
-                        <td>${i.name}</td>
+                        <td><strong>${i.name}</strong></td>
                         <td>${i.id}</td>
                         <td>${i.revenue}</td>
                         <td class="${colorClass}">${i.growth}</td>
+                        <td><span class="note-text">${i.note || '-'}</span></td>
                     </tr>
                 `;
             }).join('');
         }
 
-        // 讀取營收資料
-        fetch('./data/revenue.json')
-            .then(res => res.json())
-            .then(data => {
-                revenueData = data;
-                renderTable(revenueData);
-            }).catch(() => document.getElementById('rev-body').innerHTML = '<tr><td colspan="4">資料讀取失敗</td></tr>');
+        fetch('./data/revenue.json').then(res => res.json()).then(data => {
+            revenueData = data;
+            renderTable();
+        });
 
-        // 排序邏輯
+        document.getElementById('search').addEventListener('input', (e) => renderTable(e.target.value));
         document.getElementById('sort-growth').addEventListener('click', function() {
             sortAsc = !sortAsc;
-            this.innerText = '增減率 ' + (sortAsc ? '↑' : '↓');
-            
-            const sorted = [...revenueData].sort((a, b) => {
-                const valA = parseFloat(a.growth) || 0;
-                const valB = parseFloat(b.growth) || 0;
-                return sortAsc ? valA - valB : valB - valA;
-            });
-            
-            renderTable(sorted);
+            revenueData.sort((a, b) => (sortAsc ? 1 : -1) * (parseFloat(a.growth) - parseFloat(b.growth)));
+            renderTable(document.getElementById('search').value);
         });
     </script>
 </body>
