@@ -25,7 +25,7 @@ async function run() {
         const annRes = await axios.post('https://mops.twse.com.tw/mops/api/home_page/t05sr01_1', 
             { count: "0", marketKind: "" }, { headers });
         
-        const keywords = ['自結', '財務業務', '營收'];
+        const keywords = ['自結', '財務業務', '營收','營業收入'];
         const announcements = (annRes.data?.result?.data || [])
             .filter(item => keywords.some(k => item.subject.includes(k)))
             .slice(0, 10)
