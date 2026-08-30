@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>MOPS 股市監控看板</title>
+    <style>
+        body { font-family: "Microsoft JhengHei", sans-serif; background: #f0f2f5; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        h1 { color: #1a73e8; border-left: 5px solid #1a73e8; padding-left: 15px; display: flex; align-items: center; justify-content: space-between; }
+        .section { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 30px; }
+        .search-box { padding: 8px 15px; border: 1px solid #ddd; border-radius: 20px; font-size: 14px; width: 250px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f8f9fa; color: #5f6368; padding: 12px; text-align: left; border-bottom: 2px solid #dee2e6; }
+        th.sortable { cursor: pointer; }
+        td { padding: 12px; border-bottom: 1px solid #eee; vertical-align: top; }
+        .positive { color: #d93025; font-weight: bold; }
+        .negative { color: #188038; font-weight: bold; }
+        .note-text { font-size: 0.85em; color: #666; margin-top: 4px; display: block; max-width: 400px; line-height: 1.4; }
+        .count-badge { font-size: 0.5em; background: #1a73e8; color: white; padding: 2px 8px; border-radius: 10px; margin-left: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>
+            當月營收累計 <span id="rev-count" class="count-badge">0</span>
+            <input type="text" id="search" class="search-box" placeholder="搜尋公司名稱或代號...">
+        </h1>
+        <div class="section">
+            <table id="rev-table">
+                <thead>
+                    <tr>
+                        <th style="width: 150px;">公司名稱</th>
+                        <th style="width: 100px;">代號</th>
+                        <th style="width: 150px;">營收數據</th>
+                        <th id="sort-growth" class="sortable" style="width: 100px;">增減率 ↕</th>
+                        <th>備註說明</th>
+                    </tr>
+                </thead>
+                <tbody id="rev-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let revenueData = [];
+        let sortAsc = false;
+
+        function renderTable(filterText = '') {
+            const tbody = document.getElementById('rev-body');
+            const filtered = revenueData.filter(i => i.name.includes(filterText) || i.id.includes(filterText));
+            document.getElementById('rev-count').innerText = filtered.length;
+            tbody.innerHTML = filtered.map(i => {
+                const growthVal = parseFloat(i.growth);
+                const colorClass = growthVal > 0 ? 'positive' : (growthVal < 0 ? 'negative' : '');
+                return `
+                    <tr>
+                        <td><strong>${i.name}</strong></td>
+                        <td>${i.id}</td>
+                        <td>${i.revenue}</td>
+                        <td class="${colorClass}">${i.growth}</td>
+                        <td><span class="note-text">${i.note || '-'}</span></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        fetch('./data/revenue.json').then(res => res.json()).then(data => {
+            revenueData = data;
+            renderTable();
+        });
+
+        document.getElementById('search').addEventListener('input', (e) => renderTable(e.target.value));
+        document.getElementById('sort-growth').addEventListener('click', function() {
+            sortAsc = !sortAsc;
+            revenueData.sort((a, b) => (sortAsc ? 1 : -1) * (parseFloat(a.growth) - parseFloat(b.growth)));
+            renderTable(document.getElementById('search').value);
+        });
+    </script>
+</body>
+</html>
