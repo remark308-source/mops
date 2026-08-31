@@ -151,7 +151,7 @@ async function sendRevenueSummary(list) {
 
         for (const chunk of chunks) {
             const res = await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
-                chat_id: '-1003333218073',
+                chat_id: process.env.TELEGRAM_CHAT_ID || '-1003333218073',
                 text: chunk,
                 disable_web_page_preview: true
             }, { timeout: 30000 });
