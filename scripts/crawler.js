@@ -67,8 +67,6 @@ async function run() {
         if (fs.existsSync(revPath)) {
             try { existingRevenue = JSON.parse(fs.readFileSync(revPath)); } catch(e) {}
         }
-        // 只保留當月資料（沒有月份標記的舊資料先保留，到月末存檔時一併歸檔）
-        existingRevenue = existingRevenue.filter(i => !i.month || i.month === dataMonth);
 
         const newRevenues = [];
         const now = new Date();
@@ -79,6 +77,9 @@ async function run() {
         const dataMonth = targetMonth === 0
             ? `${now.getFullYear() - 1}-12`
             : `${now.getFullYear()}-${String(targetMonth).padStart(2, '0')}`;
+
+        // 只保留當月資料（沒有月份標記的舊資料先保留，到月末存檔時一併歸檔）
+        existingRevenue = existingRevenue.filter(i => !i.month || i.month === dataMonth);
 
         for (const item of revAnnouncements) {
             console.log(`處理: ${item.companyAbbreviation}`);
