@@ -45,20 +45,3 @@ jobs:
           git commit -m "自动更新数据: $(date)" || echo "没有数据更新"
           git pull --rebase origin main || echo "rebase 失败,跳过"
           git push
-
-  send-notification:
-    needs: run_scraper
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - name: Send Telegram notification
-        uses: appleboy/telegram-action@master
-        with:
-          to: ${{ secrets.TELEGRAM_CHAT_ID }}
-          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          message: |
-            📋 MOPS 数据抓取完成
-            Repository: ${{ github.repository }}
-            Job: ${{ needs.run_scraper.result }}
-            Run: ${{ github.run_id }}
-            Time: ${{ github.event.head_commit.timestamp || '手动触发' }}
