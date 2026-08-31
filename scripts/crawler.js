@@ -61,14 +61,13 @@ async function run() {
         // 營收抓取與合併
         const revListRes = await axios.post('https://mops.twse.com.tw/mops/api/t51sb10', { count: "0", marketKind: "" }, { headers });
         const revAnnouncements = (revListRes.data?.result?.data || [])
-            .filter(row => row.subject && row.subject.trim().endsWith('營業收入資訊')).slice(0, 15);
+            .filter(row => row.subject && row.subject.trim().endsWith('營業收入資訊'));
 
         let existingRevenue = [];
         if (fs.existsSync(revPath)) {
             try { existingRevenue = JSON.parse(fs.readFileSync(revPath)); } catch(e) {}
         }
 
-        const newRevenues = [];
         const now = new Date();
         let targetYear = now.getFullYear() - 1911;
         let targetMonth = now.getMonth();
@@ -81,7 +80,16 @@ async function run() {
         // 只保留當月資料（沒有月份標記的舊資料先保留，到月末存檔時一併歸檔）
         existingRevenue = existingRevenue.filter(i => !i.month || i.month === dataMonth);
 
-        for (const item of revAnnouncements) {
+        // 防爬批次：網站有流量限制，每次運行只抓 15 家（實測安全值）。
+        // 跳過本月任務已抓過的公司，接續抓下一批；全部抓完後從頭輪詢（偵測數據變化）。
+        const BATCH_SIZE = 15;
+        const alreadyDone = new Set(existingRevenue.map(i => String(i.id)));
+        const pending = revAnnouncements.filter(row => !alreadyDone.has(String(row.companyId)));
+        const batch = pending.length > 0 ? pending.slice(0, BATCH_SIZE) : revAnnouncements.slice(0, BATCH_SIZE);
+        console.log(`公告總數: ${revAnnouncements.length}，未抓: ${pending.length}，本次批次: ${batch.length} 家`);
+
+        const newRevenues = [];
+        for (const item of batch) {
             console.log(`處理: ${item.companyAbbreviation}`);
             try {
                 const params = new URLSearchParams({ step: '1', firstin: 'true', off: '1', isnew: 'true', co_id: item.companyId, year: targetYear.toString(), month: String(targetMonth).padStart(2, '0') });
