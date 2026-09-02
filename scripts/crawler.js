@@ -110,6 +110,25 @@ async function run() {
         fs.writeFileSync(revPath, JSON.stringify(Array.from(uniqueMap.values()), null, 2));
         console.log('任務完成');
 
+        // 4. 每日快照：把本次結果累計保留到 history.json（保留最近 30 天），供頁面按日回看
+        const todayKey = new Date(nowTpe.getTime()).toISOString().slice(0, 10); // 台北日期
+        const histPath = path.join(dataDir, 'history.json');
+        let history = { updatedAt: '', days: {} };
+        if (fs.existsSync(histPath)) {
+            try { history = JSON.parse(fs.readFileSync(histPath, 'utf8')); } catch (e) {}
+        }
+        const todaySnapshot = Array.from(uniqueMap.values());
+        if (todaySnapshot.length > 0 || !history.days[todayKey]) {
+            history.days[todayKey] = todaySnapshot;
+        }
+        const dayKeys = Object.keys(history.days).sort().slice(-30);
+        const pruned = {};
+        dayKeys.forEach(k => { pruned[k] = history.days[k]; });
+        history.days = pruned;
+        history.updatedAt = new Date().toISOString();
+        fs.writeFileSync(histPath, JSON.stringify(history, null, 2));
+        console.log(`每日快照已更新：${todayKey}（${todaySnapshot.length} 筆，共保留 ${dayKeys.length} 天）`);
+
         // 3. 推送營收彙總到 Telegram（只推本次有新資料或數據有變化的公司，避免重複刷屏）
         const existingMap = new Map(existingRevenue.map(i => [i.id, i]));
         const changed = newRevenues.filter(i => {

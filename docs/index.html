@@ -17,6 +17,9 @@
         .negative { color: #188038; font-weight: bold; }
         .note-text { font-size: 0.85em; color: #666; margin-top: 4px; display: block; max-width: 400px; line-height: 1.4; }
         .count-badge { font-size: 0.5em; background: #1a73e8; color: white; padding: 2px 8px; border-radius: 10px; margin-left: 10px; }
+        .day-nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; }
+        .day-btn { background: white; border: 1px solid #ddd; border-radius: 20px; padding: 6px 14px; cursor: pointer; font-size: 14px; color: #333; }
+        .day-btn.active { background: #1a73e8; color: white; border-color: #1a73e8; }
     </style>
 </head>
 <body>
@@ -25,6 +28,7 @@
             當月營收累計 <span id="rev-count" class="count-badge">0</span>
             <input type="text" id="search" class="search-box" placeholder="搜尋公司名稱或代號...">
         </h1>
+        <div id="day-nav" class="day-nav"></div>
         <div class="section">
             <table id="rev-table">
                 <thead>
@@ -43,11 +47,17 @@
 
     <script>
         let revenueData = [];
+        let historyDays = {};
+        let currentView = ''; // '' = 本月累計，其他 = 具體日期
         let sortAsc = false;
+
+        function currentSource() {
+            return currentView ? (historyDays[currentView] || []) : revenueData;
+        }
 
         function renderTable(filterText = '') {
             const tbody = document.getElementById('rev-body');
-            const filtered = revenueData.filter(i => i.name.includes(filterText) || i.id.includes(filterText));
+            const filtered = currentSource().filter(i => i.name.includes(filterText) || i.id.includes(filterText));
             document.getElementById('rev-count').innerText = filtered.length;
             tbody.innerHTML = filtered.map(i => {
                 const growthVal = parseFloat(i.growth);
@@ -64,15 +74,35 @@
             }).join('');
         }
 
+        function buildNav() {
+            const nav = document.getElementById('day-nav');
+            nav.innerHTML = '';
+            const mk = (label, key) => {
+                const b = document.createElement('button');
+                b.className = 'day-btn' + (currentView === key ? ' active' : '');
+                b.textContent = label;
+                b.onclick = () => { currentView = key; buildNav(); renderTable(document.getElementById('search').value); };
+                nav.appendChild(b);
+            };
+            mk('本月累計', '');
+            Object.keys(historyDays).sort().reverse().forEach(d => mk(d, d));
+        }
+
         fetch('./data/revenue.json').then(res => res.json()).then(data => {
             revenueData = data;
+            buildNav();
             renderTable();
         });
+
+        fetch('./data/history.json').then(res => res.json()).then(data => {
+            historyDays = data.days || {};
+            buildNav();
+        }).catch(() => {});
 
         document.getElementById('search').addEventListener('input', (e) => renderTable(e.target.value));
         document.getElementById('sort-growth').addEventListener('click', function() {
             sortAsc = !sortAsc;
-            revenueData.sort((a, b) => (sortAsc ? 1 : -1) * (parseFloat(a.growth) - parseFloat(b.growth)));
+            currentSource().sort((a, b) => (sortAsc ? 1 : -1) * (parseFloat(a.growth) - parseFloat(b.growth)));
             renderTable(document.getElementById('search').value);
         });
     </script>

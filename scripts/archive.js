@@ -46,6 +46,29 @@ function main() {
     // 清空頁面資料
     fs.writeFileSync(revPath, '[]');
     console.log('revenue.json 已清空，下個月從零開始');
+
+    // 歷史快照（history.json）也一併歸檔並清空
+    const histPath = path.join(dataDir, 'history.json');
+    if (fs.existsSync(histPath)) {
+        let hist = {};
+        try { hist = JSON.parse(fs.readFileSync(histPath, 'utf8')); } catch (e) {}
+        const days = hist.days || {};
+        const monthDays = {};
+        for (const [k, v] of Object.entries(days)) {
+            if (k.startsWith(monthKey) && Array.isArray(v) && v.length > 0) monthDays[k] = v;
+        }
+        if (Object.keys(monthDays).length > 0) {
+            const archiveDir = path.join(dataDir, 'archive');
+            if (!fs.existsSync(archiveDir)) fs.mkdirSync(archiveDir, { recursive: true });
+            fs.writeFileSync(
+                path.join(archiveDir, `history_${monthKey}.json`),
+                JSON.stringify({ month: monthKey, days: monthDays }, null, 2)
+            );
+            console.log(`歷史快照已存檔 ${Object.keys(monthDays).length} 天 → docs/data/archive/history_${monthKey}.json`);
+        }
+        fs.writeFileSync(histPath, JSON.stringify({ updatedAt: new Date().toISOString(), days: {} }, null, 2));
+        console.log('history.json 已清空');
+    }
 }
 
 main();
