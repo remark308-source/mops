@@ -31,11 +31,18 @@ jobs:
       - name: 安装依赖包
         run: npm install axios
 
-      - name: 执行抓取脚本
+      - name: 执行抓取脚本（失败自动重试：MOPS 会间歇性封锁 runner IP，换 IP 重试即可）
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: node scripts/crawler.js
+        run: |
+          ok=0
+          for i in 1 2 3 4; do
+            if node scripts/crawler.js; then ok=1; break; fi
+            echo "第 $i 次失敗（MOPS 可能封鎖了此 runner 的 IP），等 5 分鐘換環境重試"
+            [ "$i" -lt 4 ] && sleep 300
+          done
+          if [ "$ok" -ne 1 ]; then echo "4 次重試全部失敗"; exit 1; fi
 
       - name: 将数据存回仓库
         run: |
