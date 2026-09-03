@@ -43,6 +43,25 @@ function parseRevenueHtml(html) {
     return result;
 }
 
+/**
+ * 網路層重試：MOPS 偶爾對 GitHub Actions 的 IP 掐連線（ECONNRESET 等），重試幾次再放棄
+ */
+async function axiosRetry(fn, label, retries = 3) {
+    let lastErr;
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            return await fn();
+        } catch (err) {
+            lastErr = err;
+            if (attempt < retries) {
+                console.log(`網路錯誤(${err.code || err.message})，${attempt * 10} 秒後重試 ${attempt}/${retries - 1}：${label}`);
+                await new Promise(r => setTimeout(r, attempt * 10000));
+            }
+        }
+    }
+    throw lastErr;
+}
+
 async function run() {
     // 月末 21:00（台北）已由存檔任務清空資料，跳過當晚剩餘的抓取，避免舊資料重新寫回
     const nowTpe = new Date(Date.now() + 8 * 3600 * 1000);
@@ -58,8 +77,9 @@ async function run() {
     const revPath = path.join(dataDir, 'revenue.json');
 
     try {
-        // 營收抓取與合併
-        const revListRes = await axios.post('https://mops.twse.com.tw/mops/api/t51sb10', { count: "0", marketKind: "" }, { headers });
+        // 營收抓取與合併（網路層重試：MOPS 偶爾對 GitHub Actions 的 IP 掐連線）
+        const revListRes = await axiosRetry(() =>
+            axios.post('https://mops.twse.com.tw/mops/api/t51sb10', { count: "0", marketKind: "" }, { headers }), '公告列表');
         const revAnnouncements = (revListRes.data?.result?.data || [])
             .filter(row => row.subject && row.subject.trim().endsWith('營業收入資訊'));
 
@@ -93,10 +113,11 @@ async function run() {
             console.log(`處理: ${item.companyAbbreviation}`);
             try {
                 const params = new URLSearchParams({ step: '1', firstin: 'true', off: '1', isnew: 'true', co_id: item.companyId, year: targetYear.toString(), month: String(targetMonth).padStart(2, '0') });
-                const detailRes = await axios.post('https://mopsov.twse.com.tw/mops/web/ajax_t05st10_ifrs', params.toString(), { 
-                    headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded', 'Referer': 'https://mopsov.twse.com.tw/mops/web/t05st10_ifrs' },
-                    responseType: 'text', timeout: 25000
-                });
+                const detailRes = await axiosRetry(() =>
+                    axios.post('https://mopsov.twse.com.tw/mops/web/ajax_t05st10_ifrs', params.toString(), {
+                        headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded', 'Referer': 'https://mopsov.twse.com.tw/mops/web/t05st10_ifrs' },
+                        responseType: 'text', timeout: 25000
+                    }), `詳細頁 ${item.companyId}`);
                 const parsed = parseRevenueHtml(detailRes.data);
                 if (parsed.name) { parsed.month = dataMonth; newRevenues.push(parsed); }
                 await new Promise(r => setTimeout(r, 2000));
