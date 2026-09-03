@@ -45,8 +45,9 @@ function parseRevenueHtml(html) {
 
 /**
  * 網路層重試：MOPS 偶爾對 GitHub Actions 的 IP 掐連線（ECONNRESET 等），重試幾次再放棄
+ * 指數退避：10s → 20s → 40s → 60s，總覆蓋約 2.5 分鐘的封鎖窗口
  */
-async function axiosRetry(fn, label, retries = 3) {
+async function axiosRetry(fn, label, retries = 5) {
     let lastErr;
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {
@@ -54,8 +55,9 @@ async function axiosRetry(fn, label, retries = 3) {
         } catch (err) {
             lastErr = err;
             if (attempt < retries) {
-                console.log(`網路錯誤(${err.code || err.message})，${attempt * 10} 秒後重試 ${attempt}/${retries - 1}：${label}`);
-                await new Promise(r => setTimeout(r, attempt * 10000));
+                const wait = Math.min(attempt * 10000, 60000);
+                console.log(`網路錯誤(${err.code || err.message})，${Math.round(wait / 1000)} 秒後重試 ${attempt}/${retries - 1}：${label}`);
+                await new Promise(r => setTimeout(r, wait));
             }
         }
     }
