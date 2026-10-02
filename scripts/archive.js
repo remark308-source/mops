@@ -48,23 +48,26 @@ function main() {
     console.log('revenue.json 已清空，下個月從零開始');
 
     // 歷史快照（history.json）也一併歸檔並清空
+    // 注意：history 的 key 是「抓取日期」（西曆日），與 revenue 的 dataMonth（資料所屬月份）不同，
+    // 這裡用當前「日曆月份」過濾，月底執行時正好抓到本月的快照
     const histPath = path.join(dataDir, 'history.json');
     if (fs.existsSync(histPath)) {
         let hist = {};
         try { hist = JSON.parse(fs.readFileSync(histPath, 'utf8')); } catch (e) {}
         const days = hist.days || {};
+        const calMonth = `${nowTpe.getFullYear()}-${String(nowTpe.getMonth() + 1).padStart(2, '0')}`;
         const monthDays = {};
         for (const [k, v] of Object.entries(days)) {
-            if (k.startsWith(monthKey) && Array.isArray(v) && v.length > 0) monthDays[k] = v;
+            if (k.startsWith(calMonth) && Array.isArray(v) && v.length > 0) monthDays[k] = v;
         }
         if (Object.keys(monthDays).length > 0) {
             const archiveDir = path.join(dataDir, 'archive');
             if (!fs.existsSync(archiveDir)) fs.mkdirSync(archiveDir, { recursive: true });
             fs.writeFileSync(
-                path.join(archiveDir, `history_${monthKey}.json`),
-                JSON.stringify({ month: monthKey, days: monthDays }, null, 2)
+                path.join(archiveDir, `history_${calMonth}.json`),
+                JSON.stringify({ month: calMonth, days: monthDays }, null, 2)
             );
-            console.log(`歷史快照已存檔 ${Object.keys(monthDays).length} 天 → docs/data/archive/history_${monthKey}.json`);
+            console.log(`歷史快照已存檔 ${Object.keys(monthDays).length} 天 → docs/data/archive/history_${calMonth}.json`);
         }
         fs.writeFileSync(histPath, JSON.stringify({ updatedAt: new Date().toISOString(), days: {} }, null, 2));
         console.log('history.json 已清空');
